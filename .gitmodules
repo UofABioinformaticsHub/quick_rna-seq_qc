@@ -1,0 +1,3 @@
+[submodule "databases"]
+	path = databases
+	url = https://github.com/UofABioinformaticsHub/quick_rna-seq_qc_databases
