@@ -2,60 +2,51 @@
 
 ```bash
 git clone --recursive https://github.com/UofABioinformaticsHub/quick_rna-seq_qc
+cd quick_rna-seq_qc
 ```
 
-# Setup the Environment
+# Running the Quick RNA-Seq QC Analysis
 
-For the script to run, it is expected that the following tools be available on the `PATH`.
-
-## Modules on Phenix
+By default the supplied [`scripts/quick_qc.sbatch`](scripts/quick_qc.sbatch) script will take the first `100,000` reads from each FASTQ file
+and map those reads to the wheat rRNA sequences and the plantago chloroplast genome. The output generated will provide a summary of the
+number and percentage of reads found to map to each of these sequences for each file processed.
 
 ```bash
-module load \
-  Bowtie2/2.2.9-foss-2016b \
-  SAMtools/1.9-foss-2016b \
-  pigz/2.3.3-foss-2016b \
-  parallel/20180922-foss-2016b
+# Submit the database preparation script to Slurm
+JOBID=$( sbatch scripts/prep.sbatch quick_rna-seq_qc/databases | cut -f4 -d " " )
+
+# Submit slurm jobs for mapping raw reads against the wheat rRNA sequences
+# and the plantago chloroplast genome
+sbatch --dependency afterok:${JOBID} scripts/quick_qc.sbatch \
+  *.fastq.gz
 ```
 
-## Create Bowtie2 Indexes
+# Modifying the Quick RNA-Seq QC Tests
 
-```bash
-# Decompress the FASTA files
-find quick_rna-seq_qc/databases -name "*.fasta.gz" -exec pigz --decompress --keep --processes 2 {} +
+## Random Sampling of Reads
 
-# Bowtie2 Index the FASTA files
-find quick_rna-seq_qc/databases -name "*.fasta" -print0 \
-  | xargs -0 -I"{}" bowtie2-build --threads 4 "{}" "{}"
-```
+The supplied [`scripts/quick_qc.sbatch`](scripts/quick_qc.sbatch) script will take the first `100,000` reads from each FASTQ file. To randomly
+select reads from throughout the entire file, simply modify the `SUBSAMPLE_CMD='head'` line to read `SUBSAMPLE_CMD='shuf'`.
 
-# Test for Extent of rRNA Contamination
+Since `shuf` requires reading an entire FASTQ file from start to end, it's use can significantly increase runtimes compared with `head`.
 
-For a faster run, we subsample 10,000 reads (`-n 10000`) from the file(s) by just looking at the head (`-c head`) of the file(s). We specify the
-bowtie2 index base of just rRNA sequences, other tests will be skipped:
+## Subsample More/Less Reads
 
-```bash
-quick_rna-seq_qc/quick_rna-seq_qc.sh \
-  -d ./output_directory \
-  -m 1 \
-  -s 1 \
-  -n 10000 \
-  -c head \
-  -r quick_rna-seq_qc/databases/wheat_rRNA.fasta \
-  my.fastq.gz
-```
+The supplied [`scripts/quick_qc.sbatch`](scripts/quick_qc.sbatch) script will take the first `100,000` reads from each FASTQ file. To modify the
+number of reads subsampled, simply modify the `N_READS=100000` line to a different number e.g. `N_READS=1000` or `N_READS=500000`.
 
-For a more robust analysis we will subsample 100,000 reads (`-n 100000`) randomly (`-c shuf`) from the file(s) and also include a test
-of mapping against organelle genome sequences:
+## Test Proportion of Reads Derived from ERCC92 Spike-in Sequences
 
-```bash
-quick_rna-seq_qc/quick_rna-seq_qc.sh \
-  -d ./output_directory \
-  -m 1 \
-  -s 1 \
-  -n 100000 \
-  -c shuf \
-  -r quick_rna-seq_qc/databases/wheat_rRNA.fasta \
-  -o quick_rna-seq_qc/databases/plantago/plantago_organelles.fasta \
-  my.fastq.gz
-```
+Simply modify the call to `quick_rna-seq_qc/quick_rna-seq_qc.sh` found in the supplied [`scripts/quick_qc.sbatch`](scripts/quick_qc.sbatch) script
+to include the `-e` argument and specify the location of the [`ERCC92.fasta`](databases/common/ERCC92.fasta) file. e.g. `-e databases/common/ERCC92.fasta`.
+
+## Test Proportion of Reads Derived from Coding Sequences
+
+Simply modify the call to `quick_rna-seq_qc/quick_rna-seq_qc.sh` found in the supplied [`scripts/quick_qc.sbatch`](scripts/quick_qc.sbatch) script
+to include the `-g` argument and specify the location of the FASTA file containing coding sequences (CDS).
+e.g. `-g databases/wheat/ta_IWGSC_MIPSv2.1_HCS_REPR_CDS_2013Nov28.fasta`.
+
+## Report Total Number of Reads
+
+Simply modify the call to `quick_rna-seq_qc/quick_rna-seq_qc.sh` found in the supplied [`scripts/quick_qc.sbatch`](scripts/quick_qc.sbatch) script
+to include the `-t` option.
