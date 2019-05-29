@@ -50,3 +50,23 @@ e.g. `-g databases/wheat/ta_IWGSC_MIPSv2.1_HCS_REPR_CDS_2013Nov28.fasta`.
 
 Simply modify the call to `quick_rna-seq_qc/quick_rna-seq_qc.sh` found in the supplied [`scripts/quick_qc.sbatch`](scripts/quick_qc.sbatch) script
 to include the `-t` option.
+
+# Robust Quick RNA-Seq QC
+
+For a robust Quick RNA-Seq QC analysis, a command similar to the following could be used:
+
+```bash
+quick_rna-seq_qc.sh \
+  -d ./output_directory \
+  -m 2 \
+  -s 2 \
+  -n 100000 \
+  -c shuf \
+  -r databases/wheat/wheat_rRNA.fasta \
+  -o databases/plantago/plantago_organelles.fasta \
+  -e databases/common/ERCC92.fasta \
+  -g databases/wheat/ta_IWGSC_MIPSv2.1_HCS_REPR_CDS_2013Nov28.fasta \
+  -t \
+  *.fastq.gz \
+> report.tab
+```
