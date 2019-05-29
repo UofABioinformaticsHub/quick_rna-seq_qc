@@ -105,6 +105,8 @@ fi
 outdir=${outdir%/}
 #echo "outdir: ${outdir}"
 
+echo -e "Filename\tAdapter Containing Reads (#)\tAdapter Containing Reads (%)\trRNA Mapping Reads (#)\trRNA Mapping Reads (%)\tOrganelle Mapping Reads (#)\tOrganelle Mapping Reads (%)\tCDS Mapping Reads (#)\tCDS Mapping Reads (%)\tERCC92 Mapping Reads (#)\tERCC92 Mapping Reads (%)\tTotal Reads (#)"
+
 for file in "$@"; do
   #echo >&2 "Processing: ${file}"
   echo -n "${file}"
