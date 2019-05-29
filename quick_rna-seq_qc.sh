@@ -13,10 +13,6 @@
 #        mkdir output
 #        find ./ -name "*.fastq.gz" -exec /home/nhaigh/git/rna-seq_qc/quick_rna-seq_qc.sh ./output {} \; > quick_rna-seq_qc.out
 
-#bowtie2_dir='/usr/local/Programs/bowtie2/bowtie2-2.2.3'
-#samtools_dir='/usr/local/Programs/samtools/samtools-1.0'
-#common_code_dir='/usr/local/Programs/common-code/common-code-head'
-
 n_mapping_threads=20
 n_sorting_threads=10
 
@@ -30,7 +26,7 @@ outdir='./'
 
 rRNA_reference_index_base=''
 organelle_reference_index_base=''
-hcs_reference_index_base=''
+cds_reference_index_base=''
 ercc_reference_index_base=''
 adapter_sequences=()
 
@@ -50,11 +46,11 @@ where:
   -r Perform rRNA contamination quantification using this rRNA FASTA index file
   -o Perform organelle contamination quantification using this Organelle FASTA index file
   -e Perform ERCC spike-in quantification using this ERCC FASTA index file
-  -c Perform gene quantification using this CDS FASTA index file
+  -g Perform gene quantification using this CDS FASTA index file
   -t Display total reads column
 "
 
-while getopts ":hd:m:s:n:c:a:r:o:e:c:t" opt; do
+while getopts ":hd:m:s:n:c:a:r:o:e:g:t" opt; do
   case $opt in
     h) echo "$usage"
        exit;;
@@ -67,7 +63,7 @@ while getopts ":hd:m:s:n:c:a:r:o:e:c:t" opt; do
     r) rRNA_reference_index_base=$OPTARG;;
     o) organelle_reference_index_base=$OPTARG;;
     e) ercc_reference_index_base=$OPTARG;;
-    c) hcs_reference_index_base=$OPTARG;;
+    g) cds_reference_index_base=$OPTARG;;
     t) get_total_reads=1;;
     ?) printf "Illegal option: '-%s'\n" "$OPTARG" >&2
        echo "$usage" >&2
@@ -187,18 +183,18 @@ for file in "$@"; do
   fi
 
   ##########
-  # 5 HCS-mapping
+  # 5 CDS-mapping
   ##########
   echo -ne "\t"
-  if [ ! -z "${hcs_reference_index_base}" ]; then
+  if [ ! -z "${cds_reference_index_base}" ]; then
     ED=3
-    bowtie2 --time --threads ${n_mapping_threads} -N 1 -L 10 -i S,1,0.25 -D 30 -R 4 --ma 0 --mp 2 --np 2 --score-min "L,-$((ED*2)),0" --rdg 999,999 --rfg 999,999 -x ${hcs_reference_index_base} -U <(pigz -dcp 2 "${file}" | paste - - - - | ${subset_cmd} -n ${n_read_subsample_mapping} | tr '\t' '\n') 2> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.HCS_mapping.log" \
-      | samtools calmd -S - ${hcs_reference_index_base} 2> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.HCS_calmd.log" \
-      | samtools view -buS - 2> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.HCS_view.log" \
-      | samtools sort -@ ${n_sorting_threads} -m 25G - "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}_vs_IWGSC-HCS" &> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.HCS_sort.log"
-    samtools index "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}_vs_IWGSC-HCS.bam"
-    n_hcs_mapped=$(samtools view -F 4 "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}_vs_IWGSC-HCS.bam" 2> /dev/stderr | cut -f 1 | sort -u --parallel=${n_sorting_threads} -S 25G | wc -l)
-    echo -ne "${n_hcs_mapped}\t$(bc <<< "scale=2; ${n_hcs_mapped} * 100 / ${n_read_subsample_mapping}")%"
+    bowtie2 --time --threads ${n_mapping_threads} -N 1 -L 10 -i S,1,0.25 -D 30 -R 4 --ma 0 --mp 2 --np 2 --score-min "L,-$((ED*2)),0" --rdg 999,999 --rfg 999,999 -x ${cds_reference_index_base} -U <(pigz -dcp 2 "${file}" | paste - - - - | ${subset_cmd} -n ${n_read_subsample_mapping} | tr '\t' '\n') 2> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.CDS_mapping.log" \
+      | samtools calmd -S - ${cds_reference_index_base} 2> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.CDS_calmd.log" \
+      | samtools view -buS - 2> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.CDS_view.log" \
+      | samtools sort -@ ${n_sorting_threads} -m 25G -o "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}_vs_CDS.bam" - &> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.CDS_sort.log"
+    samtools index -c "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}_vs_CDS.bam"
+    n_cds_mapped=$(samtools view -F 4 "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}_vs_CDS.bam" 2> /dev/stderr | cut -f 1 | sort -u --parallel=${n_sorting_threads} -S 25G | wc -l)
+    echo -ne "${n_cds_mapped}\t$(bc <<< "scale=2; ${n_cds_mapped} * 100 / ${n_read_subsample_mapping}")%"
   else
     echo -ne "NA\tNA%"
   fi
@@ -213,8 +209,8 @@ for file in "$@"; do
     bowtie2 --time --threads ${n_mapping_threads} -N 1 -L 10 -i S,1,0.25 -D 30 -R 4 --ma 0 --mp 2 --np 2 --score-min "L,-$((ED*2)),0" --rdg 999,999 --rfg 999,999 -x ${ercc_reference_index_base} -U <(pigz -dcp 2 "${file}" | paste - - - - | ${subset_cmd} -n ${n_read_subsample_mapping} | tr '\t' '\n') 2> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.ERCC92_mapping.log" \
       | samtools calmd -S - ${ercc_reference_index_base} 2> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.ERCC92_calmd.log" \
       | samtools view -buS - 2> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.ERCC92_view.log" \
-      | samtools sort -@ ${n_sorting_threads} -m 25G - "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}_vs_ERCC92" &> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.ERCC92_sort.log"
-    samtools index "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}_vs_ERCC92.bam"
+      | samtools sort -@ ${n_sorting_threads} -m 25G -o "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}_vs_ERCC92.bam" - &> "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}.ERCC92_sort.log"
+    samtools index -c "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}_vs_ERCC92.bam"
     n_ercc_mapped=$(samtools view -F 4 "${outdir}/${file_path##*.}/${file_basename%%.fastq.gz}_vs_ERCC92.bam" 2> /dev/stderr | cut -f 1 | sort -u --parallel=${n_sorting_threads} -S 25G | wc -l)
     echo -ne "${n_ercc_mapped}\t$(bc <<< "scale=2; ${n_ercc_mapped} * 100 / ${n_read_subsample_mapping}")%"
   else
