@@ -1,3 +1,17 @@
+# Purpose
+
+This repository provides the code for performing quick RNA-Seq QC of data as it arrives from a service provider. Key metrics which are
+important to assess ASAP after arrival of data is things like:
+
+ 1. What proportion of reads contain adpater sequence
+ 2. What proportion of reads originate from rRNA
+ 3. What proportion of reads originate from organelle genomes
+ 4. What proportion of reads originate from CDS
+ 5. What proportion of reads originate from ERCC92 spike-in sequences
+
+Knowing a quick answer to these questions can tell you if something went wrong with the library prep or sequencing so that affected samples
+can be resequenced without delay.
+
 # Obtain the code
 
 ```bash
